@@ -1,7 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 set -o errexit
 set -o nounset
 set -o pipefail
+
+# root direction for saving file
+# There's a confusing bug for me that I cannot use $HOME directly
+HOME="/root"
 
 # Automatically update your CloudFlare DNS record to the IP, Dynamic DNS
 # Can retrieve cloudflare Domain id and list zone's, because, lazy
@@ -50,16 +54,6 @@ FORCE=false
 
 WANIPSITE="http://ipv4.icanhazip.com"
 
-# Site to retrieve WAN ip, other examples are: bot.whatismyipaddress.com, https://api.ipify.org/ ...
-if [ "$CFRECORD_TYPE" = "A" ]; then
-  :
-elif [ "$CFRECORD_TYPE" = "AAAA" ]; then
-  WANIPSITE="http://ipv6.icanhazip.com"
-else
-  echo "$CFRECORD_TYPE specified is invalid, CFRECORD_TYPE can only be A(for IPv4)|AAAA(for IPv6)"
-  exit 2
-fi
-
 # get parameter
 while getopts k:u:h:z:t:f: opts; do
   case ${opts} in
@@ -71,6 +65,16 @@ while getopts k:u:h:z:t:f: opts; do
     f) FORCE=${OPTARG} ;;
   esac
 done
+
+# Site to retrieve WAN ip, other examples are: bot.whatismyipaddress.com, https://api.ipify.org/ ...
+if [ "$CFRECORD_TYPE" = "A" ]; then
+  :
+elif [ "$CFRECORD_TYPE" = "AAAA" ]; then
+  WANIPSITE="http://ipv6.icanhazip.com"
+else
+  echo "$CFRECORD_TYPE specified is invalid, CFRECORD_TYPE can only be A(for IPv4)|AAAA(for IPv6)"
+  exit 2
+fi
 
 # If required settings are missing just exit
 if [ "$CFKEY" = "" ]; then
@@ -97,7 +101,7 @@ fi
 
 # Get current and old WAN ip
 WAN_IP=`curl -s ${WANIPSITE}`
-WAN_IP_FILE=$HOME/.cf-wan_ip_$CFRECORD_NAME.txt
+WAN_IP_FILE=$HOME/.cf-wan_ip_$CFRECORD_NAME\_$CFRECORD_TYPE.txt
 if [ -f $WAN_IP_FILE ]; then
   OLD_WAN_IP=`cat $WAN_IP_FILE`
 else
@@ -112,7 +116,7 @@ if [ "$WAN_IP" = "$OLD_WAN_IP" ] && [ "$FORCE" = false ]; then
 fi
 
 # Get zone_identifier & record_identifier
-ID_FILE=$HOME/.cf-id_$CFRECORD_NAME.txt
+ID_FILE=$HOME/.cf-id_$CFRECORD_NAME\_$CFRECORD_TYPE.txt
 if [ -f $ID_FILE ] && [ $(wc -l $ID_FILE | cut -d " " -f 1) == 4 ] \
   && [ "$(sed -n '3,1p' "$ID_FILE")" == "$CFZONE_NAME" ] \
   && [ "$(sed -n '4,1p' "$ID_FILE")" == "$CFRECORD_NAME" ]; then
